@@ -1,0 +1,9 @@
+---
+app:
+  name: mounted-yaml-editor
+  environment: local
+server:
+  port: 3000
+features:
+  login: true
+  mountedFolder: /data

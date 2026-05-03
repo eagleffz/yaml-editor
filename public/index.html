@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>YAML Editor</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <svg aria-hidden="true" class="icon-sprite">
+      <symbol id="icon-log-in" viewBox="0 0 24 24">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+        <path d="M10 17l5-5-5-5"/>
+        <path d="M15 12H3"/>
+      </symbol>
+      <symbol id="icon-log-out" viewBox="0 0 24 24">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <path d="M16 17l5-5-5-5"/>
+        <path d="M21 12H9"/>
+      </symbol>
+      <symbol id="icon-save" viewBox="0 0 24 24">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/>
+        <path d="M17 21v-8H7v8"/>
+        <path d="M7 3v5h8"/>
+      </symbol>
+      <symbol id="icon-refresh" viewBox="0 0 24 24">
+        <path d="M21 12a9 9 0 0 1-15.3 6.4"/>
+        <path d="M3 12A9 9 0 0 1 18.3 5.6"/>
+        <path d="M21 4v6h-6"/>
+        <path d="M3 20v-6h6"/>
+      </symbol>
+      <symbol id="icon-plus" viewBox="0 0 24 24">
+        <path d="M12 5v14"/>
+        <path d="M5 12h14"/>
+      </symbol>
+      <symbol id="icon-file" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/>
+        <path d="M14 2v6h6"/>
+      </symbol>
+      <symbol id="icon-check" viewBox="0 0 24 24">
+        <path d="M20 6 9 17l-5-5"/>
+      </symbol>
+      <symbol id="icon-alert" viewBox="0 0 24 24">
+        <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>
+        <path d="M12 9v4"/>
+        <path d="M12 17h.01"/>
+      </symbol>
+    </svg>
+
+    <main id="loginView" class="login-view hidden">
+      <form id="loginForm" class="login-panel">
+        <div>
+          <p class="eyebrow">Mounted YAML Editor</p>
+          <h1>Anmelden</h1>
+        </div>
+        <label>
+          <span>Benutzer</span>
+          <input id="username" name="username" autocomplete="username" required>
+        </label>
+        <label>
+          <span>Passwort</span>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <p id="loginError" class="error-line" role="alert"></p>
+        <button class="primary-button" type="submit">
+          <svg><use href="#icon-log-in"></use></svg>
+          <span>Anmelden</span>
+        </button>
+      </form>
+    </main>
+
+    <main id="appView" class="app-shell hidden">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Mounted YAML Editor</p>
+          <h1>YAML Editor</h1>
+        </div>
+        <div class="topbar-actions">
+          <span id="userBadge" class="user-badge"></span>
+          <button id="logoutButton" class="ghost-button" type="button" title="Abmelden">
+            <svg><use href="#icon-log-out"></use></svg>
+            <span>Abmelden</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <aside class="sidebar">
+          <div class="sidebar-header">
+            <h2>Dateien</h2>
+            <button id="refreshFilesButton" class="icon-button" type="button" title="Aktualisieren">
+              <svg><use href="#icon-refresh"></use></svg>
+              <span class="visually-hidden">Aktualisieren</span>
+            </button>
+          </div>
+          <input id="fileSearch" class="search-input" placeholder="Suchen" autocomplete="off">
+          <form id="newFileForm" class="new-file-form">
+            <input id="newFilePath" placeholder="config.yaml" autocomplete="off">
+            <button class="icon-button" type="submit" title="Neue Datei">
+              <svg><use href="#icon-plus"></use></svg>
+              <span class="visually-hidden">Neu</span>
+            </button>
+          </form>
+          <div id="fileList" class="file-list"></div>
+          <p id="fileListMeta" class="sidebar-meta"></p>
+        </aside>
+
+        <section class="editor-pane">
+          <div class="editor-header">
+            <div class="current-file">
+              <svg><use href="#icon-file"></use></svg>
+              <span id="currentFileName">Keine Datei</span>
+            </div>
+            <div class="editor-actions">
+              <button id="reloadButton" class="ghost-button" type="button" title="Neu laden" disabled>
+                <svg><use href="#icon-refresh"></use></svg>
+                <span>Neu laden</span>
+              </button>
+              <button id="saveButton" class="primary-button save-button" type="button" title="Speichern" disabled>
+                <svg><use href="#icon-save"></use></svg>
+                <span>Speichern</span>
+              </button>
+            </div>
+          </div>
+          <textarea id="editor" spellcheck="false" disabled></textarea>
+          <section id="lintPanel" class="lint-panel hidden" aria-live="polite">
+            <div class="lint-title">
+              <svg><use href="#icon-alert"></use></svg>
+              <span id="lintSummary">YAML-Lint</span>
+            </div>
+            <ul id="lintList" class="lint-list"></ul>
+          </section>
+          <footer class="statusbar">
+            <span id="dirtyState">Bereit</span>
+            <span id="editorStats">0 Zeilen</span>
+            <span id="yamlCheck">Basischeck bereit</span>
+          </footer>
+        </section>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

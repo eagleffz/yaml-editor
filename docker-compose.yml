@@ -1,0 +1,14 @@
+services:
+  yaml-editor:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      APP_USERNAME: admin
+      APP_PASSWORD: change-me
+      SESSION_SECRET: change-this-local-secret
+      DATA_DIR: /data
+      MAX_FILE_BYTES: 1048576
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

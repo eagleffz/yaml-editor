@@ -5,10 +5,18 @@ Eine einfache Webanwendung mit Login zum Bearbeiten und Linten von `.yaml`- und 
 ## Start mit Docker Compose
 
 ```bash
-docker compose up --build
+docker compose pull
+docker compose up -d
 ```
 
 Danach: `http://localhost:3000`
+
+`docker-compose.yml` verwendet das Image `ghcr.io/eagleffz/yaml-editor:latest`.
+Falls das GitHub Container Registry Package privat ist, vorher anmelden:
+
+```bash
+docker login ghcr.io
+```
 
 Standardwerte aus `docker-compose.yml`:
 
@@ -48,3 +56,5 @@ Die lokale App liest dann standardmaessig aus `./data`.
 ## CI
 
 Unter `.github/workflows/ci.yml` liegt eine GitHub Actions Pipeline. Sie fuehrt `npm ci`, `npm run check`, `npm test`, `docker compose config` und einen Docker-Build aus.
+
+Bei Pushes auf den Default-Branch veroeffentlicht die Pipeline das Container-Image als `ghcr.io/eagleffz/yaml-editor:latest`. Zusaetzlich wird jedes gepushte Image mit `sha-<commit>` getaggt. Pull Requests bauen das Image nur zur Pruefung und pushen nichts nach GHCR.

@@ -1,6 +1,6 @@
 services:
   yaml-editor:
-    build: .
+    image: ghcr.io/eagleffz/yaml-editor:latest
     ports:
       - "3000:3000"
     environment:

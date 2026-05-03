@@ -5,8 +5,11 @@ const state = {
   currentMtimeMs: null,
   dirty: false,
   lintTimer: null,
-  lintRequestId: 0
+  lintRequestId: 0,
+  lintMessages: []
 };
+
+const THEME_STORAGE_KEY = 'yaml-editor-theme';
 
 const elements = {
   loginView: document.querySelector('#loginView'),
@@ -27,13 +30,17 @@ const elements = {
   reloadButton: document.querySelector('#reloadButton'),
   saveButton: document.querySelector('#saveButton'),
   editor: document.querySelector('#editor'),
+  lineNumbers: document.querySelector('#lineNumbers'),
+  issueHighlights: document.querySelector('#issueHighlights'),
+  issueHighlightList: document.querySelector('#issueHighlightList'),
   lintPanel: document.querySelector('#lintPanel'),
   lintSummary: document.querySelector('#lintSummary'),
   lintList: document.querySelector('#lintList'),
   dirtyState: document.querySelector('#dirtyState'),
   editorStats: document.querySelector('#editorStats'),
   yamlCheck: document.querySelector('#yamlCheck'),
-  toast: document.querySelector('#toast')
+  toast: document.querySelector('#toast'),
+  themeToggles: document.querySelectorAll('[data-theme-toggle]')
 };
 
 async function api(path, options = {}) {
@@ -65,6 +72,56 @@ function showToast(message) {
   }, 2400);
 }
 
+function readStoredTheme() {
+  try {
+    return window.localStorage.getItem(THEME_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredTheme(theme) {
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // Local storage can be unavailable in strict browser modes.
+  }
+}
+
+function getPreferredTheme() {
+  const storedTheme = readStoredTheme();
+  if (storedTheme === 'dark' || storedTheme === 'light') {
+    return storedTheme;
+  }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function applyTheme(theme) {
+  const nextTheme = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = nextTheme;
+  for (const toggle of elements.themeToggles) {
+    toggle.checked = nextTheme === 'dark';
+  }
+}
+
+function initTheme() {
+  applyTheme(getPreferredTheme());
+  for (const toggle of elements.themeToggles) {
+    toggle.addEventListener('change', () => {
+      const nextTheme = toggle.checked ? 'dark' : 'light';
+      writeStoredTheme(nextTheme);
+      applyTheme(nextTheme);
+    });
+  }
+
+  const colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  colorSchemeQuery.addEventListener?.('change', () => {
+    if (!readStoredTheme()) {
+      applyTheme(getPreferredTheme());
+    }
+  });
+}
+
 function showLogin() {
   elements.loginView.classList.remove('hidden');
   elements.appView.classList.add('hidden');
@@ -94,10 +151,100 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function getEditorLineCount() {
+  if (elements.editor.disabled && !state.currentPath) {
+    return 0;
+  }
+  return Math.max(1, elements.editor.value.split('\n').length);
+}
+
+function getIssueMap() {
+  const issueMap = new Map();
+  for (const message of state.lintMessages) {
+    const line = Number.parseInt(message.line, 10);
+    if (!Number.isInteger(line) || line < 1) {
+      continue;
+    }
+
+    const previous = issueMap.get(line);
+    const severity = message.severity === 'error' || previous?.severity === 'error' ? 'error' : 'warning';
+    const messages = previous?.messages || [];
+    messages.push(message.message);
+    issueMap.set(line, { severity, messages });
+  }
+  return issueMap;
+}
+
+function renderEditorAnnotations() {
+  const lineCount = getEditorLineCount();
+  const issueMap = getIssueMap();
+  const lineFragment = document.createDocumentFragment();
+  const highlightFragment = document.createDocumentFragment();
+
+  for (let line = 1; line <= lineCount; line += 1) {
+    const issue = issueMap.get(line);
+    const severityClass = issue ? ` ${issue.severity}` : '';
+    const title = issue?.messages.join('\n') || '';
+
+    const lineNumber = document.createElement('span');
+    lineNumber.className = `line-number${severityClass}`;
+    lineNumber.textContent = line;
+    if (title) {
+      lineNumber.title = title;
+    }
+    lineFragment.append(lineNumber);
+
+    const highlight = document.createElement('span');
+    highlight.className = `issue-highlight${severityClass}`;
+    if (title) {
+      highlight.title = title;
+    }
+    highlightFragment.append(highlight);
+  }
+
+  elements.lineNumbers.replaceChildren(lineFragment);
+  elements.issueHighlightList.replaceChildren(highlightFragment);
+  syncEditorScroll();
+}
+
+function syncEditorScroll() {
+  elements.lineNumbers.scrollTop = elements.editor.scrollTop;
+  elements.issueHighlights.scrollTop = elements.editor.scrollTop;
+}
+
+function getEditorLineHeight() {
+  return Number.parseFloat(window.getComputedStyle(elements.editor).lineHeight) || 22;
+}
+
+function getLineStartOffset(lineNumber) {
+  const lines = elements.editor.value.split('\n');
+  let offset = 0;
+  for (let index = 0; index < Math.min(lineNumber - 1, lines.length); index += 1) {
+    offset += lines[index].length + 1;
+  }
+  return offset;
+}
+
+function focusEditorLine(lineNumber) {
+  const line = Number.parseInt(lineNumber, 10);
+  if (!Number.isInteger(line) || line < 1) {
+    return;
+  }
+
+  const lines = elements.editor.value.split('\n');
+  const offset = getLineStartOffset(line);
+  const selectedLine = lines[line - 1] || '';
+  elements.editor.focus();
+  elements.editor.setSelectionRange(offset, offset + selectedLine.length);
+  elements.editor.scrollTop = Math.max(0, (line - 1) * getEditorLineHeight() - 60);
+  syncEditorScroll();
+}
+
 function updateEditorStats() {
   const content = elements.editor.value;
-  const lines = content.length === 0 ? 0 : content.split('\n').length;
+  const lines = getEditorLineCount();
   elements.editorStats.textContent = `${lines} Zeilen, ${formatBytes(new Blob([content]).size)}`;
+  renderEditorAnnotations();
   scheduleYamlLint(content);
 }
 
@@ -107,6 +254,8 @@ function setLintStatus(text, className = '') {
 }
 
 function renderLintMessages(messages) {
+  state.lintMessages = messages;
+  renderEditorAnnotations();
   elements.lintList.replaceChildren();
 
   if (messages.length === 0) {
@@ -139,6 +288,17 @@ function renderLintMessages(messages) {
     item.querySelector('.lint-severity').textContent = message.severity === 'error' ? 'Fehler' : 'Warnung';
     item.querySelector('.lint-location').textContent = location;
     item.querySelector('.lint-message').textContent = message.message;
+    if (message.line) {
+      item.tabIndex = 0;
+      item.title = 'Zur Zeile springen';
+      item.addEventListener('click', () => focusEditorLine(message.line));
+      item.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          focusEditorLine(message.line);
+        }
+      });
+    }
     elements.lintList.append(item);
   }
 }
@@ -146,12 +306,20 @@ function renderLintMessages(messages) {
 function scheduleYamlLint(content) {
   window.clearTimeout(state.lintTimer);
   if (!state.currentPath || elements.editor.disabled) {
+    state.lintMessages = [];
+    renderEditorAnnotations();
     elements.lintPanel.classList.add('hidden');
     setLintStatus('YAML-Lint bereit');
     return;
   }
 
   setLintStatus('YAML wird geprueft');
+  state.lintRequestId += 1;
+  state.lintMessages = [];
+  renderEditorAnnotations();
+  elements.lintPanel.classList.add('hidden');
+  elements.lintList.replaceChildren();
+  elements.lintSummary.textContent = 'YAML-Lint';
   state.lintTimer = window.setTimeout(() => runYamlLint(content), 300);
 }
 
@@ -170,6 +338,8 @@ async function runYamlLint(content) {
     if (requestId !== state.lintRequestId) {
       return;
     }
+    state.lintMessages = [];
+    renderEditorAnnotations();
     elements.lintPanel.classList.add('hidden');
     setLintStatus(error.message, 'error');
   }
@@ -229,7 +399,9 @@ async function openFile(filePath) {
   elements.currentFileName.textContent = payload.path;
   elements.editor.disabled = false;
   elements.editor.value = payload.content;
+  elements.editor.scrollTop = 0;
   elements.reloadButton.disabled = false;
+  state.lintMessages = [];
   markDirty(false);
   updateEditorStats();
   renderFiles();
@@ -303,15 +475,18 @@ async function logout() {
   state.currentPath = null;
   state.currentMtimeMs = null;
   state.lintRequestId += 1;
+  state.lintMessages = [];
   window.clearTimeout(state.lintTimer);
   elements.editor.value = '';
   elements.editor.disabled = true;
+  renderEditorAnnotations();
   elements.lintPanel.classList.add('hidden');
   setLintStatus('YAML-Lint bereit');
   showLogin();
 }
 
 async function init() {
+  initTheme();
   elements.loginForm.addEventListener('submit', login);
   elements.logoutButton.addEventListener('click', logout);
   elements.refreshFilesButton.addEventListener('click', loadFiles);
@@ -323,6 +498,7 @@ async function init() {
     markDirty(true);
     updateEditorStats();
   });
+  elements.editor.addEventListener('scroll', syncEditorScroll);
   window.addEventListener('keydown', (event) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
       event.preventDefault();

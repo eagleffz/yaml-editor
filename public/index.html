@@ -53,6 +53,13 @@
           <p class="eyebrow">Mounted YAML Editor</p>
           <h1>Anmelden</h1>
         </div>
+        <label class="theme-toggle">
+          <input data-theme-toggle type="checkbox">
+          <span class="theme-toggle-track" aria-hidden="true">
+            <span class="theme-toggle-thumb"></span>
+          </span>
+          <span>Darkmode</span>
+        </label>
         <label>
           <span>Benutzer</span>
           <input id="username" name="username" autocomplete="username" required>
@@ -76,6 +83,13 @@
           <h1>YAML Editor</h1>
         </div>
         <div class="topbar-actions">
+          <label class="theme-toggle">
+            <input data-theme-toggle type="checkbox">
+            <span class="theme-toggle-track" aria-hidden="true">
+              <span class="theme-toggle-thumb"></span>
+            </span>
+            <span>Darkmode</span>
+          </label>
           <span id="userBadge" class="user-badge"></span>
           <button id="logoutButton" class="ghost-button" type="button" title="Abmelden">
             <svg><use href="#icon-log-out"></use></svg>
@@ -122,7 +136,13 @@
               </button>
             </div>
           </div>
-          <textarea id="editor" spellcheck="false" disabled></textarea>
+          <div class="editor-shell">
+            <div id="issueHighlights" class="issue-highlights" aria-hidden="true">
+              <div id="issueHighlightList" class="issue-highlight-list"></div>
+            </div>
+            <div id="lineNumbers" class="line-gutter" aria-hidden="true"></div>
+            <textarea id="editor" spellcheck="false" wrap="off" disabled></textarea>
+          </div>
           <section id="lintPanel" class="lint-panel hidden" aria-live="polite">
             <div class="lint-title">
               <svg><use href="#icon-alert"></use></svg>

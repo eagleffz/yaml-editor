@@ -3,18 +3,69 @@
   --bg: #f5f7fb;
   --panel: #ffffff;
   --panel-strong: #eef2f7;
+  --topbar-bg: #ffffff;
+  --sidebar-bg: #fbfcff;
+  --input-bg: #ffffff;
+  --button-bg: #ffffff;
+  --button-hover: #eef2f7;
+  --editor-bg: #ffffff;
+  --editor-disabled-bg: #f8fafc;
+  --line-gutter-bg: #f8fafc;
+  --line-number: #687385;
   --text: #1d2430;
   --muted: #687385;
   --border: #d8deea;
   --blue: #246bfd;
   --blue-dark: #1653ca;
   --green: #137a4b;
+  --green-dark: #0f633d;
   --amber: #9b6400;
   --red: #b42318;
   --red-soft: #fff2f0;
   --amber-soft: #fff8e6;
+  --line-error-bg: rgba(180, 35, 24, 0.11);
+  --line-warning-bg: rgba(155, 100, 0, 0.14);
+  --focus-ring: rgba(36, 107, 253, 0.15);
+  --editor-focus-ring: rgba(36, 107, 253, 0.28);
+  --editor-gutter-width: 58px;
+  --editor-pad-x: 18px;
+  --editor-pad-y: 18px;
+  --editor-font-size: 14px;
+  --editor-line-height: 22px;
   --shadow: 0 18px 55px rgba(20, 31, 49, 0.12);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #101216;
+  --panel: #181b21;
+  --panel-strong: #252a33;
+  --topbar-bg: #171a20;
+  --sidebar-bg: #141820;
+  --input-bg: #11141a;
+  --button-bg: #1b2028;
+  --button-hover: #252b35;
+  --editor-bg: #0f1217;
+  --editor-disabled-bg: #171b22;
+  --line-gutter-bg: #151922;
+  --line-number: #8f9aaa;
+  --text: #eef2f7;
+  --muted: #9aa5b4;
+  --border: #343b49;
+  --blue: #6f9eff;
+  --blue-dark: #8eb3ff;
+  --green: #43bf82;
+  --green-dark: #35a56d;
+  --amber: #e0a236;
+  --red: #ff776e;
+  --red-soft: rgba(255, 119, 110, 0.14);
+  --amber-soft: rgba(224, 162, 54, 0.16);
+  --line-error-bg: rgba(255, 119, 110, 0.17);
+  --line-warning-bg: rgba(224, 162, 54, 0.16);
+  --focus-ring: rgba(111, 158, 255, 0.22);
+  --editor-focus-ring: rgba(111, 158, 255, 0.3);
+  --shadow: 0 18px 55px rgba(0, 0, 0, 0.38);
 }
 
 * {
@@ -134,7 +185,7 @@ textarea {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--input-bg);
   color: var(--text);
   outline: none;
 }
@@ -147,7 +198,7 @@ input {
 input:focus,
 textarea:focus {
   border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(36, 107, 253, 0.15);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .error-line {
@@ -185,12 +236,12 @@ textarea:focus {
 }
 
 .save-button:hover:not(:disabled) {
-  background: #0f633d;
+  background: var(--green-dark);
 }
 
 .ghost-button {
   padding: 0 12px;
-  background: #fff;
+  background: var(--button-bg);
   border-color: var(--border);
   color: var(--text);
 }
@@ -198,15 +249,74 @@ textarea:focus {
 .ghost-button:hover:not(:disabled),
 .icon-button:hover:not(:disabled) {
   border-color: #aeb8cb;
-  background: var(--panel-strong);
+  background: var(--button-hover);
 }
 
 .icon-button {
   width: 38px;
   padding: 0;
-  background: #fff;
+  background: var(--button-bg);
   border-color: var(--border);
   color: var(--text);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.theme-toggle input {
+  position: absolute;
+  width: 1px;
+  min-height: 0;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.theme-toggle-track {
+  width: 42px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--button-bg);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.theme-toggle-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--muted);
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.theme-toggle input:checked + .theme-toggle-track {
+  border-color: var(--blue);
+  background: var(--blue);
+}
+
+.theme-toggle input:checked + .theme-toggle-track .theme-toggle-thumb {
+  background: #fff;
+  transform: translateX(18px);
+}
+
+.theme-toggle input:focus-visible + .theme-toggle-track {
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .app-shell {
@@ -222,7 +332,7 @@ textarea:focus {
   justify-content: space-between;
   gap: 18px;
   padding: 14px 18px;
-  background: #fff;
+  background: var(--topbar-bg);
   border-bottom: 1px solid var(--border);
 }
 
@@ -257,7 +367,7 @@ textarea:focus {
   grid-template-rows: auto auto auto 1fr auto;
   gap: 12px;
   padding: 16px;
-  background: #fbfcff;
+  background: var(--sidebar-bg);
   border-right: 1px solid var(--border);
 }
 
@@ -271,7 +381,7 @@ textarea:focus {
 }
 
 .search-input {
-  background: #fff;
+  background: var(--input-bg);
 }
 
 .new-file-form {
@@ -305,7 +415,7 @@ textarea:focus {
 
 .file-row:hover,
 .file-row.active {
-  background: #fff;
+  background: var(--panel);
   border-color: var(--border);
 }
 
@@ -345,7 +455,7 @@ textarea:focus {
 .editor-header {
   min-height: 58px;
   padding: 10px 16px;
-  background: #fff;
+  background: var(--topbar-bg);
   border-bottom: 1px solid var(--border);
 }
 
@@ -369,24 +479,114 @@ textarea:focus {
   gap: 8px;
 }
 
+.editor-shell {
+  min-height: 0;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--editor-bg);
+}
+
+.editor-shell:focus-within {
+  box-shadow: inset 0 0 0 2px var(--editor-focus-ring);
+}
+
+.line-gutter,
+.issue-highlights {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.line-gutter {
+  left: 0;
+  z-index: 3;
+  width: var(--editor-gutter-width);
+  padding: var(--editor-pad-y) 0;
+  border-right: 1px solid var(--border);
+  background: var(--line-gutter-bg);
+  color: var(--line-number);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.line-number {
+  display: block;
+  height: var(--editor-line-height);
+  padding: 0 10px 0 6px;
+  line-height: var(--editor-line-height);
+  text-align: right;
+}
+
+.line-number.error,
+.line-number.warning {
+  font-weight: 800;
+}
+
+.line-number.error {
+  background: var(--line-error-bg);
+  color: var(--red);
+}
+
+.line-number.warning {
+  background: var(--line-warning-bg);
+  color: var(--amber);
+}
+
+.issue-highlights {
+  left: var(--editor-gutter-width);
+  right: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.issue-highlight-list {
+  min-width: 100%;
+  padding: var(--editor-pad-y) 0;
+}
+
+.issue-highlight {
+  display: block;
+  height: var(--editor-line-height);
+  border-left: 3px solid transparent;
+}
+
+.issue-highlight.error {
+  background: var(--line-error-bg);
+  border-left-color: var(--red);
+}
+
+.issue-highlight.warning {
+  background: var(--line-warning-bg);
+  border-left-color: var(--amber);
+}
+
 textarea {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
   min-height: 0;
   resize: none;
   border: 0;
   border-radius: 0;
-  padding: 18px;
+  padding: var(--editor-pad-y) var(--editor-pad-x) var(--editor-pad-y) calc(var(--editor-gutter-width) + var(--editor-pad-x));
+  background: transparent;
+  caret-color: var(--text);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: var(--editor-font-size);
+  line-height: var(--editor-line-height);
   tab-size: 2;
 }
 
 textarea:disabled {
-  background: #f8fafc;
+  background: var(--editor-disabled-bg);
 }
 
 textarea:focus {
-  box-shadow: inset 0 0 0 2px rgba(36, 107, 253, 0.28);
+  box-shadow: none;
 }
 
 .lint-panel {
@@ -395,7 +595,7 @@ textarea:focus {
   display: grid;
   gap: 8px;
   padding: 10px 16px;
-  background: #fff;
+  background: var(--panel);
   border-top: 1px solid var(--border);
 }
 
@@ -427,6 +627,15 @@ textarea:focus {
   line-height: 1.35;
 }
 
+.lint-item[tabindex] {
+  cursor: pointer;
+}
+
+.lint-item[tabindex]:focus {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
 .lint-item.error {
   background: var(--red-soft);
   color: var(--red);
@@ -451,7 +660,7 @@ textarea:focus {
 .statusbar {
   min-height: 40px;
   padding: 0 16px;
-  background: #fff;
+  background: var(--topbar-bg);
   border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: 12px;

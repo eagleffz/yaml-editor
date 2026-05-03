@@ -23,6 +23,13 @@ Standardwerte aus `docker-compose.yml`:
 - Benutzer: `admin`
 - Passwort: `change-me`
 - Gemounteter Ordner: `./data` im Projekt nach `/data` im Container
+- Container-Benutzer: `PUID=1000`, `PGID=1000`
+
+Damit die App Dateien im gemounteten Ordner mit deinem Host-Benutzer schreibt:
+
+```bash
+PUID=$(id -u) PGID=$(id -g) docker compose up -d
+```
 
 ## Konfiguration
 
@@ -36,6 +43,8 @@ Die App wird per Environment-Variablen konfiguriert:
 | `DATA_DIR` | `./data` lokal, `/data` im Dockerfile | Ordner mit YAML-Dateien |
 | `MAX_FILE_BYTES` | `1048576` | Maximale Dateigroesse fuer den Editor |
 | `PORT` | `3000` | HTTP-Port |
+| `PUID` | `1000` | UID, unter der der Prozess im Container laeuft |
+| `PGID` | `1000` | GID, unter der der Prozess im Container laeuft |
 
 ## Lokal ohne Docker
 

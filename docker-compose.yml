@@ -9,6 +9,8 @@ services:
       SESSION_SECRET: change-this-local-secret
       DATA_DIR: /data
       MAX_FILE_BYTES: 1048576
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
     volumes:
       - ./data:/data
     restart: unless-stopped

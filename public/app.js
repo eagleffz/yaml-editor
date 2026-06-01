@@ -40,7 +40,8 @@ const elements = {
   editorStats: document.querySelector('#editorStats'),
   yamlCheck: document.querySelector('#yamlCheck'),
   toast: document.querySelector('#toast'),
-  themeToggles: document.querySelectorAll('[data-theme-toggle]')
+  themeToggles: document.querySelectorAll('[data-theme-toggle]'),
+  syntaxHighlight: document.querySelector('#syntaxHighlight')
 };
 
 async function api(path, options = {}) {
@@ -210,6 +211,8 @@ function renderEditorAnnotations() {
 function syncEditorScroll() {
   elements.lineNumbers.scrollTop = elements.editor.scrollTop;
   elements.issueHighlights.scrollTop = elements.editor.scrollTop;
+  elements.syntaxHighlight.scrollTop = elements.editor.scrollTop;
+  elements.syntaxHighlight.scrollLeft = elements.editor.scrollLeft;
 }
 
 function getEditorLineHeight() {
@@ -240,11 +243,125 @@ function focusEditorLine(lineNumber) {
   syncEditorScroll();
 }
 
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function wrapSpan(cls, raw) {
+  return `<span class="${cls}">${escapeHtml(raw)}</span>`;
+}
+
+function tokenizeValue(raw) {
+  if (!raw) return '';
+  const out = [];
+  let plain = '';
+  let i = 0;
+
+  const flush = () => { if (plain) { out.push(escapeHtml(plain)); plain = ''; } };
+
+  while (i < raw.length) {
+    const ch = raw[i];
+    const rest = raw.slice(i);
+
+    if (ch === '#' && (i === 0 || /\s/.test(raw[i - 1]))) {
+      flush();
+      out.push(wrapSpan('hl-comment', rest));
+      break;
+    }
+    if (ch === '"') {
+      flush();
+      const m = rest.match(/^"(?:[^"\\]|\\.)*"/);
+      const s = m ? m[0] : rest;
+      out.push(wrapSpan('hl-string', s));
+      i += s.length;
+      continue;
+    }
+    if (ch === "'") {
+      flush();
+      const m = rest.match(/^'[^']*'/);
+      const s = m ? m[0] : rest;
+      out.push(wrapSpan('hl-string', s));
+      i += s.length;
+      continue;
+    }
+    if ((ch === '&' || ch === '*') && /\w/.test(raw[i + 1] || '')) {
+      flush();
+      const m = rest.match(/^[&*]\w+/);
+      out.push(wrapSpan('hl-anchor', m[0]));
+      i += m[0].length;
+      continue;
+    }
+    if (/\w/.test(ch) && (i === 0 || !/\w/.test(raw[i - 1]))) {
+      const kw = rest.match(/^(true|false|null|yes|no|on|off|~)(?!\w)/i);
+      if (kw) {
+        flush();
+        out.push(wrapSpan('hl-bool', kw[1]));
+        i += kw[1].length;
+        continue;
+      }
+      const num = rest.match(/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?(?!\w)/);
+      if (num) {
+        flush();
+        out.push(wrapSpan('hl-number', num[0]));
+        i += num[0].length;
+        continue;
+      }
+    }
+    plain += ch;
+    i++;
+  }
+  flush();
+  return out.join('');
+}
+
+function highlightLine(line) {
+  const m = line.match(/^(\s*)(.*)/s);
+  const indent = escapeHtml(m[1]);
+  const rest = m[2];
+  if (!rest) return indent || '';
+
+  if (/^---\s*$|^\.\.\.\s*$/.test(rest)) {
+    return indent + wrapSpan('hl-marker', rest);
+  }
+  if (rest[0] === '#') {
+    return indent + wrapSpan('hl-comment', rest);
+  }
+
+  let prefix = '';
+  let content = rest;
+  const listM = content.match(/^(-\s*)(.*)/s);
+  if (listM) {
+    prefix = wrapSpan('hl-list', listM[1]);
+    content = listM[2];
+  }
+
+  const keyM = content.match(/^([\w][\w .-]*)(\s*:[ \t]?)(.*)/s);
+  if (keyM) {
+    return indent + prefix + wrapSpan('hl-key', keyM[1]) + escapeHtml(keyM[2]) + tokenizeValue(keyM[3]);
+  }
+
+  return indent + prefix + tokenizeValue(content);
+}
+
+function updateSyntaxHighlight() {
+  if (elements.editor.disabled || !state.currentPath) {
+    elements.syntaxHighlight.innerHTML = '';
+    return;
+  }
+  const text = elements.editor.value;
+  if (text.length > 100_000) {
+    elements.syntaxHighlight.innerHTML = '';
+    return;
+  }
+  elements.syntaxHighlight.innerHTML = text.split('\n').map(highlightLine).join('\n');
+}
+
 function updateEditorStats() {
   const content = elements.editor.value;
   const lines = getEditorLineCount();
   elements.editorStats.textContent = `${lines} Zeilen, ${formatBytes(new Blob([content]).size)}`;
   renderEditorAnnotations();
+  updateSyntaxHighlight();
   scheduleYamlLint(content);
 }
 
@@ -479,6 +596,7 @@ async function logout() {
   window.clearTimeout(state.lintTimer);
   elements.editor.value = '';
   elements.editor.disabled = true;
+  elements.syntaxHighlight.innerHTML = '';
   renderEditorAnnotations();
   elements.lintPanel.classList.add('hidden');
   setLintStatus('YAML-Lint bereit');
@@ -497,6 +615,18 @@ async function init() {
   elements.editor.addEventListener('input', () => {
     markDirty(true);
     updateEditorStats();
+  });
+  elements.editor.addEventListener('keydown', (event) => {
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      const start = elements.editor.selectionStart;
+      const end = elements.editor.selectionEnd;
+      const value = elements.editor.value;
+      elements.editor.value = `${value.slice(0, start)}  ${value.slice(end)}`;
+      elements.editor.selectionStart = elements.editor.selectionEnd = start + 2;
+      markDirty(true);
+      updateEditorStats();
+    }
   });
   elements.editor.addEventListener('scroll', syncEditorScroll);
   window.addEventListener('keydown', (event) => {

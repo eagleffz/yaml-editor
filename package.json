@@ -1,6 +1,6 @@
 {
   "name": "mounted-yaml-editor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Simple login-protected YAML editor for files in a mounted Docker folder.",
   "type": "module",
   "scripts": {

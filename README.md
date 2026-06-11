@@ -2,6 +2,23 @@
 
 Eine einfache Webanwendung mit Login zum Bearbeiten und Linten von `.yaml`- und `.yml`-Dateien in einem gemounteten Ordner. Gedacht fuer interne, nicht sicherheitskritische Umgebungen.
 
+## Funktionen
+
+- Dateibaum mit Suche, Anlegen neuer Dateien, Speichern mit Konfliktschutz (mtime-Check)
+- YAML-Syntax-Highlighting und Zeilennummern
+- Serverseitiges YAML-Linting mit Fehler-/Warnungsmarkierung direkt im Editor
+- Einklappbare YAML-Bloecke ueber die Pfeile in der Zeilenleiste (einrueckungsbasiert)
+- Cleanup-Button: formatiert das YAML sauber (2 Leerzeichen Einrueckung, Kommentare bleiben erhalten)
+- Hell-/Dunkelmodus
+
+### Tastenkuerzel
+
+| Kuerzel | Aktion |
+| --- | --- |
+| `Strg/Cmd + S` | Speichern |
+| `Strg/Cmd + Shift + F` | YAML formatieren (Cleanup) |
+| `Tab` | 2 Leerzeichen einruecken |
+
 ## Start mit Docker Compose
 
 ```bash
@@ -61,6 +78,8 @@ Die lokale App liest dann standardmaessig aus `./data`.
 - Symlinks werden beim Auflisten uebersprungen.
 - Es werden nur Dateien mit `.yaml` oder `.yml` angezeigt und gespeichert.
 - YAML wird beim Bearbeiten serverseitig geprueft; Parser-Fehler und einfache Stilwarnungen erscheinen direkt im Editor.
+- Der Cleanup-Button formatiert ueber `/api/format`; ungueltiges YAML wird nicht formatiert, sondern mit Fehlermeldung abgelehnt.
+- Eingeklappte Bloecke sind nur ausgeblendet: Speichern, Linting und Statusanzeige arbeiten immer mit dem vollstaendigen Inhalt.
 
 ## CI
 

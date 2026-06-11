@@ -37,6 +37,10 @@
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/>
         <path d="M14 2v6h6"/>
       </symbol>
+      <symbol id="icon-sparkles" viewBox="0 0 24 24">
+        <path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/>
+        <path d="m19 14 .7 1.8 1.8.7-1.8.7L19 19l-.7-1.8-1.8-.7 1.8-.7Z"/>
+      </symbol>
       <symbol id="icon-check" viewBox="0 0 24 24">
         <path d="M20 6 9 17l-5-5"/>
       </symbol>
@@ -127,6 +131,10 @@
               <span id="currentFileName">Keine Datei</span>
             </div>
             <div class="editor-actions">
+              <button id="formatButton" class="ghost-button" type="button" title="YAML sauber formatieren (Strg/Cmd+Shift+F)" disabled>
+                <svg><use href="#icon-sparkles"></use></svg>
+                <span>Cleanup</span>
+              </button>
               <button id="reloadButton" class="ghost-button" type="button" title="Neu laden" disabled>
                 <svg><use href="#icon-refresh"></use></svg>
                 <span>Neu laden</span>

@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { createServer, isYamlFileName, lintYamlContent, resolveYamlPath } from '../src/server.js';
+import { createServer, formatYamlContent, isYamlFileName, lintYamlContent, resolveYamlPath } from '../src/server.js';
 
 function testConfig(dataDir) {
   return {
@@ -47,6 +47,14 @@ test('YAML linter reports parser errors and style warnings', () => {
   assert.equal(warning.valid, true);
   assert.equal(warning.messages[0].severity, 'warning');
   assert.match(warning.messages[0].message, /Leerzeichen/);
+});
+
+test('YAML formatter cleans up indentation and keeps comments', () => {
+  const formatted = formatYamlContent('# comment\nname:    example\nlist:\n    - a\n    - b\n');
+  assert.equal(formatted, '# comment\nname: example\nlist:\n  - a\n  - b\n');
+
+  assert.equal(formatYamlContent(''), '');
+  assert.throws(() => formatYamlContent('name: [broken\n'), /formatiert/);
 });
 
 test('API logs in, lists, reads and saves YAML files', async (t) => {

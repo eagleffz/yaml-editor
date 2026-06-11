@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LineCounter, parseDocument } from 'yaml';
+import { LineCounter, parseAllDocuments, parseDocument } from 'yaml';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -165,6 +165,22 @@ export function lintYamlContent(content) {
     valid: messages.every((message) => message.severity !== 'error'),
     messages
   };
+}
+
+export function formatYamlContent(content) {
+  const source = typeof content === 'string' ? content : '';
+  if (source.trim() === '') {
+    return source;
+  }
+
+  const documents = parseAllDocuments(source, { uniqueKeys: true });
+  if (documents.some((document) => document.errors.length > 0)) {
+    throw new HttpError(422, 'YAML enthaelt Fehler und kann nicht formatiert werden.');
+  }
+
+  return documents
+    .map((document) => document.toString({ indent: 2, lineWidth: 0 }))
+    .join('');
 }
 
 function safeCompare(a, b) {
@@ -328,6 +344,16 @@ async function handleApi(req, res, config) {
       throw new HttpError(413, 'File content is too large.');
     }
     sendJson(res, 200, lintYamlContent(content));
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/format') {
+    const body = await readJsonBody(req, config.maxFileBytes + 16 * 1024);
+    const content = typeof body.content === 'string' ? body.content : '';
+    if (Buffer.byteLength(content, 'utf8') > config.maxFileBytes) {
+      throw new HttpError(413, 'File content is too large.');
+    }
+    sendJson(res, 200, { content: formatYamlContent(content) });
     return;
   }
 

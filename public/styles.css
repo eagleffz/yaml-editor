@@ -514,11 +514,40 @@ textarea:focus {
 }
 
 .line-number {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
   height: var(--editor-line-height);
-  padding: 0 10px 0 6px;
+  padding: 0 10px 0 4px;
   line-height: var(--editor-line-height);
-  text-align: right;
+}
+
+.fold-caret {
+  flex: none;
+  width: 12px;
+  font-size: 10px;
+  text-align: center;
+  color: transparent;
+}
+
+.line-number.foldable {
+  cursor: pointer;
+}
+
+.line-number.foldable .fold-caret {
+  color: var(--line-number);
+}
+
+.line-number.foldable:hover {
+  background: var(--button-hover);
+  color: var(--text);
+}
+
+.line-number.folded,
+.line-number.folded .fold-caret {
+  color: var(--blue);
+  font-weight: 800;
 }
 
 .line-number.error,
@@ -586,6 +615,16 @@ textarea:focus {
 .hl-marker { color: var(--muted); font-weight: 700; }
 .hl-anchor { color: var(--amber); }
 .hl-list { color: var(--muted); }
+
+.hl-fold-badge {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 11px;
+}
 
 textarea {
   position: absolute;

@@ -6,7 +6,8 @@ const state = {
   dirty: false,
   lintTimer: null,
   lintRequestId: 0,
-  lintMessages: []
+  lintMessages: [],
+  folds: []
 };
 
 const THEME_STORAGE_KEY = 'yaml-editor-theme';
@@ -27,6 +28,7 @@ const elements = {
   fileList: document.querySelector('#fileList'),
   fileListMeta: document.querySelector('#fileListMeta'),
   currentFileName: document.querySelector('#currentFileName'),
+  formatButton: document.querySelector('#formatButton'),
   reloadButton: document.querySelector('#reloadButton'),
   saveButton: document.querySelector('#saveButton'),
   editor: document.querySelector('#editor'),
@@ -159,13 +161,168 @@ function getEditorLineCount() {
   return Math.max(1, elements.editor.value.split('\n').length);
 }
 
+function getIndentWidth(line) {
+  return line.match(/^ */)[0].length;
+}
+
+function getFoldRegion(lines, headerIndex) {
+  const header = lines[headerIndex];
+  if (header === undefined || header.trim() === '' || header.trim().startsWith('#')) {
+    return null;
+  }
+
+  const headerIndent = getIndentWidth(header);
+  let end = headerIndex;
+  for (let index = headerIndex + 1; index < lines.length; index += 1) {
+    if (lines[index].trim() === '') {
+      continue;
+    }
+    if (getIndentWidth(lines[index]) > headerIndent) {
+      end = index;
+      continue;
+    }
+    break;
+  }
+
+  if (end === headerIndex) {
+    return null;
+  }
+  return { start: headerIndex + 1, end };
+}
+
+function getFoldableFlags(lines) {
+  const flags = new Array(lines.length).fill(false);
+  let nextIndent = -1;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const trimmed = lines[index].trim();
+    if (trimmed === '') {
+      continue;
+    }
+    const indent = getIndentWidth(lines[index]);
+    flags[index] = !trimmed.startsWith('#') && nextIndent > indent;
+    nextIndent = indent;
+  }
+  return flags;
+}
+
+function getFullContent() {
+  if (state.folds.length === 0) {
+    return elements.editor.value;
+  }
+  const lines = elements.editor.value.split('\n');
+  for (let index = state.folds.length - 1; index >= 0; index -= 1) {
+    const fold = state.folds[index];
+    lines.splice(fold.header, 0, ...fold.lines);
+  }
+  return lines.join('\n');
+}
+
+function fullToVisible(fullLine) {
+  let offset = 0;
+  for (const fold of state.folds) {
+    const fullHeader = fold.header + offset;
+    if (fullLine <= fullHeader) {
+      break;
+    }
+    if (fullLine <= fullHeader + fold.lines.length) {
+      return fold.header;
+    }
+    offset += fold.lines.length;
+  }
+  return fullLine - offset;
+}
+
+function applyEditorLines(lines) {
+  const { scrollTop, scrollLeft } = elements.editor;
+  elements.editor.value = lines.join('\n');
+  elements.editor.scrollTop = scrollTop;
+  elements.editor.scrollLeft = scrollLeft;
+}
+
+function toggleFold(headerLine) {
+  const lines = elements.editor.value.split('\n');
+  const existing = state.folds.find((fold) => fold.header === headerLine);
+
+  if (existing) {
+    lines.splice(headerLine, 0, ...existing.lines);
+    state.folds = state.folds.filter((fold) => fold !== existing);
+    for (const fold of state.folds) {
+      if (fold.header > headerLine) {
+        fold.header += existing.lines.length;
+      }
+    }
+  } else {
+    const region = getFoldRegion(lines, headerLine - 1);
+    if (!region) {
+      return;
+    }
+    const visibleLength = region.end - region.start + 1;
+
+    // Bereits gefaltete Bloecke innerhalb der Region zuerst wieder einsetzen,
+    // damit keine verschachtelten Folds mit veralteten Positionen zurueckbleiben.
+    const innerFolds = state.folds
+      .filter((fold) => fold.header - 1 >= region.start && fold.header - 1 <= region.end)
+      .sort((a, b) => b.header - a.header);
+    for (const fold of innerFolds) {
+      lines.splice(fold.header, 0, ...fold.lines);
+      region.end += fold.lines.length;
+      state.folds = state.folds.filter((other) => other !== fold);
+    }
+
+    const hidden = lines.splice(region.start, region.end - region.start + 1);
+    for (const fold of state.folds) {
+      if (fold.header > headerLine) {
+        fold.header -= visibleLength;
+      }
+    }
+    state.folds.push({ header: headerLine, lines: hidden });
+    state.folds.sort((a, b) => a.header - b.header);
+  }
+
+  applyEditorLines(lines);
+  updateEditorStats();
+}
+
+function getLineOfOffset(offset) {
+  return elements.editor.value.slice(0, offset).split('\n').length;
+}
+
+function unfoldAll() {
+  if (state.folds.length === 0) {
+    return;
+  }
+
+  const { selectionStart, selectionEnd, scrollTop, scrollLeft } = elements.editor;
+  const startLine = getLineOfOffset(selectionStart);
+  const endLine = getLineOfOffset(selectionEnd);
+  let startDelta = 0;
+  let endDelta = 0;
+  for (const fold of state.folds) {
+    const hiddenLength = fold.lines.join('\n').length + 1;
+    if (fold.header < startLine) {
+      startDelta += hiddenLength;
+    }
+    if (fold.header < endLine) {
+      endDelta += hiddenLength;
+    }
+  }
+
+  elements.editor.value = getFullContent();
+  state.folds = [];
+  elements.editor.setSelectionRange(selectionStart + startDelta, selectionEnd + endDelta);
+  elements.editor.scrollTop = scrollTop;
+  elements.editor.scrollLeft = scrollLeft;
+  updateEditorStats();
+}
+
 function getIssueMap() {
   const issueMap = new Map();
   for (const message of state.lintMessages) {
-    const line = Number.parseInt(message.line, 10);
-    if (!Number.isInteger(line) || line < 1) {
+    const fullLine = Number.parseInt(message.line, 10);
+    if (!Number.isInteger(fullLine) || fullLine < 1) {
       continue;
     }
+    const line = fullToVisible(fullLine);
 
     const previous = issueMap.get(line);
     const severity = message.severity === 'error' || previous?.severity === 'error' ? 'error' : 'warning';
@@ -179,19 +336,47 @@ function getIssueMap() {
 function renderEditorAnnotations() {
   const lineCount = getEditorLineCount();
   const issueMap = getIssueMap();
+  const lines = elements.editor.value.split('\n');
+  const foldableFlags = getFoldableFlags(lines);
+  const foldedHeaders = new Set(state.folds.map((fold) => fold.header));
   const lineFragment = document.createDocumentFragment();
   const highlightFragment = document.createDocumentFragment();
+  let foldIndex = 0;
+  let hiddenOffset = 0;
 
   for (let line = 1; line <= lineCount; line += 1) {
+    while (foldIndex < state.folds.length && state.folds[foldIndex].header < line) {
+      hiddenOffset += state.folds[foldIndex].lines.length;
+      foldIndex += 1;
+    }
+
     const issue = issueMap.get(line);
     const severityClass = issue ? ` ${issue.severity}` : '';
     const title = issue?.messages.join('\n') || '';
+    const folded = foldedHeaders.has(line);
+    const foldable = folded || foldableFlags[line - 1];
 
     const lineNumber = document.createElement('span');
     lineNumber.className = `line-number${severityClass}`;
-    lineNumber.textContent = line;
+    const caret = document.createElement('span');
+    caret.className = 'fold-caret';
+    const label = document.createElement('span');
+    label.textContent = line + hiddenOffset;
+    lineNumber.append(caret, label);
     if (title) {
       lineNumber.title = title;
+    }
+    if (foldable) {
+      caret.textContent = folded ? '▸' : '▾';
+      lineNumber.classList.add('foldable');
+      if (folded) {
+        lineNumber.classList.add('folded');
+      }
+      if (!title) {
+        lineNumber.title = folded ? 'Aufklappen' : 'Einklappen';
+      }
+      const targetLine = line;
+      lineNumber.addEventListener('click', () => toggleFold(targetLine));
     }
     lineFragment.append(lineNumber);
 
@@ -234,6 +419,7 @@ function focusEditorLine(lineNumber) {
     return;
   }
 
+  unfoldAll();
   const lines = elements.editor.value.split('\n');
   const offset = getLineStartOffset(line);
   const selectedLine = lines[line - 1] || '';
@@ -353,12 +539,22 @@ function updateSyntaxHighlight() {
     elements.syntaxHighlight.innerHTML = '';
     return;
   }
-  elements.syntaxHighlight.innerHTML = text.split('\n').map(highlightLine).join('\n');
+  const foldBadges = new Map(state.folds.map((fold) => [fold.header, fold.lines.length]));
+  elements.syntaxHighlight.innerHTML = text.split('\n').map((line, index) => {
+    let html = highlightLine(line);
+    const hiddenCount = foldBadges.get(index + 1);
+    if (hiddenCount) {
+      html += `<span class="hl-fold-badge">… ${hiddenCount} ${hiddenCount === 1 ? 'Zeile' : 'Zeilen'}</span>`;
+    }
+    return html;
+  }).join('\n');
 }
 
 function updateEditorStats() {
-  const content = elements.editor.value;
-  const lines = getEditorLineCount();
+  const content = getFullContent();
+  const lines = elements.editor.disabled && !state.currentPath
+    ? 0
+    : Math.max(1, content.split('\n').length);
   elements.editorStats.textContent = `${lines} Zeilen, ${formatBytes(new Blob([content]).size)}`;
   renderEditorAnnotations();
   updateSyntaxHighlight();
@@ -513,11 +709,13 @@ async function openFile(filePath) {
   const payload = await api(`/api/file?path=${encodeURIComponent(filePath)}`);
   state.currentPath = payload.path;
   state.currentMtimeMs = payload.mtimeMs;
+  state.folds = [];
   elements.currentFileName.textContent = payload.path;
   elements.editor.disabled = false;
   elements.editor.value = payload.content;
   elements.editor.scrollTop = 0;
   elements.reloadButton.disabled = false;
+  elements.formatButton.disabled = false;
   state.lintMessages = [];
   markDirty(false);
   updateEditorStats();
@@ -534,7 +732,7 @@ async function saveCurrentFile() {
     method: 'POST',
     body: JSON.stringify({
       path: state.currentPath,
-      content: elements.editor.value,
+      content: getFullContent(),
       mtimeMs: state.currentMtimeMs
     })
   });
@@ -543,6 +741,31 @@ async function saveCurrentFile() {
   markDirty(false);
   showToast('Gespeichert');
   await loadFiles();
+}
+
+async function formatCurrentFile() {
+  if (!state.currentPath) {
+    return;
+  }
+
+  unfoldAll();
+  const content = elements.editor.value;
+  try {
+    const payload = await api('/api/format', {
+      method: 'POST',
+      body: JSON.stringify({ content })
+    });
+    if (payload.content === content) {
+      showToast('Bereits sauber formatiert');
+      return;
+    }
+    elements.editor.value = payload.content;
+    markDirty(true);
+    updateEditorStats();
+    showToast('YAML formatiert');
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
 async function createNewFile(event) {
@@ -593,9 +816,12 @@ async function logout() {
   state.currentMtimeMs = null;
   state.lintRequestId += 1;
   state.lintMessages = [];
+  state.folds = [];
   window.clearTimeout(state.lintTimer);
   elements.editor.value = '';
   elements.editor.disabled = true;
+  elements.reloadButton.disabled = true;
+  elements.formatButton.disabled = true;
   elements.syntaxHighlight.innerHTML = '';
   renderEditorAnnotations();
   elements.lintPanel.classList.add('hidden');
@@ -612,6 +838,11 @@ async function init() {
   elements.newFileForm.addEventListener('submit', createNewFile);
   elements.reloadButton.addEventListener('click', () => state.currentPath && openFile(state.currentPath));
   elements.saveButton.addEventListener('click', saveCurrentFile);
+  elements.formatButton.addEventListener('click', formatCurrentFile);
+  elements.editor.addEventListener('beforeinput', () => {
+    // Bearbeiten arbeitet immer auf dem vollstaendigen Text.
+    unfoldAll();
+  });
   elements.editor.addEventListener('input', () => {
     markDirty(true);
     updateEditorStats();
@@ -619,6 +850,7 @@ async function init() {
   elements.editor.addEventListener('keydown', (event) => {
     if (event.key === 'Tab') {
       event.preventDefault();
+      unfoldAll();
       const start = elements.editor.selectionStart;
       const end = elements.editor.selectionEnd;
       const value = elements.editor.value;
@@ -630,9 +862,16 @@ async function init() {
   });
   elements.editor.addEventListener('scroll', syncEditorScroll);
   window.addEventListener('keydown', (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+    if (!(event.metaKey || event.ctrlKey)) {
+      return;
+    }
+    if (event.key.toLowerCase() === 's') {
       event.preventDefault();
       saveCurrentFile();
+    }
+    if (event.shiftKey && event.key.toLowerCase() === 'f') {
+      event.preventDefault();
+      formatCurrentFile();
     }
   });
 
